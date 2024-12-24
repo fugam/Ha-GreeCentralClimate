@@ -119,19 +119,20 @@ class GreeBridge(object):
                 try:
                     fake_socket = socket.socket(
                         socket.AF_INET, socket.SOCK_STREAM)
-                    fake_socket.settimeout(30)
+                    fake_socket.settimeout(60)
                     fake_socket.connect(('dis.gree.com', 1812))
                 except:
                     _LOGGER.debug('connect fake server error')
                     fake_socket.close()
                     fake_socket = None
-                    time.sleep(30)
+                    time.sleep(60)
                     continue
                 self.fake_socket = fake_socket
             try:
-                self.fake_socket.settimeout(30)
+                self.fake_socket.settimeout(60)
                 data, _ = self.fake_socket.recvfrom(65535)
             except (ConnectionResetError, BrokenPipeError) as e:
+                _LOGGER.error('Fake socket received ConnectionResetError or BrokenPipeError: {}'.format(str(e)))
                 self.fake_socket = None
                 continue
             except Exception as e:
@@ -157,6 +158,8 @@ class GreeBridge(object):
             _LOGGER.info('  process data: {} msg: {}'.format(data, msg))
             cmd = msg['t']
             match cmd:
+                case 'hb':
+                    self.cmd_hb()
                 case 'pack':
                     self.cmd_pack(msg['pack'])
                 case 'dev':
@@ -181,6 +184,10 @@ class GreeBridge(object):
             reqData, self.conf_host))
         self.device_socket.sendto(json.dumps(reqData).encode(
             'utf-8'), (self.conf_host, DEFAULT_PORT))
+
+    def cmd_hb(self):
+        answer = {'t': 'hbok'}
+        self.fake_socket.sendall(json.dumps(answer).encode())
 
     def cmd_pack(self, pack):
         self.reset_count = 0
@@ -277,7 +284,7 @@ class GreeBridge(object):
         msg = self.pack_message(data)
         _LOGGER.debug('cmd send status data: {}'.format(data))
         if self.fake_socket is not None:
-            _LOGGER.debug('cmd send status to fake server')
+            _LOGGER.debug('cmd send status to fake server self.host: {}'.format(self.host))
             try:
                 self.fake_socket.sendall((json.dumps({
                     't': 'pas',
